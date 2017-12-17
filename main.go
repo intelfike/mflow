@@ -140,7 +140,7 @@ table {
 	border-left: 1px solid black;
 }
 th{
-	background-color: white;
+	background-color: white !important;
 	padding: 8px;
 	border-bottom: 1px solid black;
 }
@@ -154,7 +154,6 @@ th, td{
 }
 .col-1, .col-3, .col-5, .col-7, .col-9, .col-11{
 	background-color: #EEEEEE;
-	opacity: 0.8;
 	text-align: center;
 	font-size: 80%;
 }
