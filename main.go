@@ -130,11 +130,12 @@ func main() {
 <mate charset="utf-8">
 <style>
 body {
+	background-color: #F8F8F8;
 	font-size: 18px;
 }
 table {
 	border-spacing: 0;
-	border: 1px solid black;
+	margin-bottom: 32px;
 }
 th{
 	border-bottom: 1px solid black;
@@ -144,8 +145,13 @@ th, td{
 	border-right: 1px solid black;
 	vertical-align: top;
 }
+.col-0, .col-2, .col-4, .col-6, .col-8, .col-10{
+	background-color: white;
+
+}
 .col-1, .col-3, .col-5, .col-7, .col-9, .col-11{
 	background-color: #F8F8F8;
+	opacity: 0.8;
 	text-align: center;
 	font-size: 80%;
 }
@@ -239,6 +245,7 @@ mflow [filename]
 [タグ]説明(詳細)
 
 #### 例:
+test.mfw
 ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 ブラウザ | (表示・入力) | JS | (通信) | PHP
 
@@ -261,7 +268,6 @@ HTMLで表示
 [ブラウザ]
 メッセージを閉じる
 終了
-
 
 ---
 テキストエリアのデータをPOSTするプログラムのフロー<br>
