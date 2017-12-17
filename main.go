@@ -135,9 +135,12 @@ body {
 }
 table {
 	border-spacing: 0;
-	margin: 32px;
+	margin: 16px;
+	border-top: 1px solid black;
+	border-left: 1px solid black;
 }
 th{
+	padding: 8px;
 	border-bottom: 1px solid black;
 }
 th, td{
