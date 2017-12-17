@@ -2,8 +2,10 @@
 順次処理、通信や入出力の流れを組み合わせて図に表すことができるツールです。
 
 ```
-独自形式ファイル →[このツール]→ HTML
+# 独自形式ファイル → HTML
+mflow test.mfw > test.html
 ```
+
 
 ## 変換元ファイル
 test.mfw
@@ -37,4 +39,4 @@ HTMLで表示
 ```
 
 ## 変換後のページ
-mflow test.mfw > test.html
+<img src="https://github.com/intelfike/mflow/blob/master/sample_image/ss.png">
