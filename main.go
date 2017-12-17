@@ -130,12 +130,12 @@ func main() {
 <mate charset="utf-8">
 <style>
 body {
-	background-color: #F8F8F8;
+	background-color: #EEEEEE;
 	font-size: 18px;
 }
 table {
 	border-spacing: 0;
-	margin-bottom: 32px;
+	margin: 32px;
 }
 th{
 	border-bottom: 1px solid black;
@@ -150,7 +150,7 @@ th, td{
 
 }
 .col-1, .col-3, .col-5, .col-7, .col-9, .col-11{
-	background-color: #F8F8F8;
+	background-color: #EEEEEE;
 	opacity: 0.8;
 	text-align: center;
 	font-size: 80%;
