@@ -257,7 +257,7 @@ func createTable(headers []*Cell, data [][]*Cell) string {
 
 func fetchHeader(lines []string) ([]string, error) {
 	head := lines[0]
-	headers := regexp.MustCompile("\\[[^\\]]+\\]|[^\\[]+").FindAllString(head, -1)
+	headers := regexp.MustCompile("\\[[^\\]]+\\]|[^\\[]*").FindAllString(head, -1)
 	for n, v := range headers {
 		headers[n] = strings.Trim(v, " 　\t[]")
 	}
@@ -291,12 +291,12 @@ mflow [filename]
 #### 例:
 test.mfw
 ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-ブラウザ | 表示・入力 | JS | 通信 | PHP
+[ブラウザ] 表示・入力 [JS] 通信 [PHP]
 
 [ブラウザ]
 ページ訪問
 フォーム入力
-submitボタンクリック
+#submitボタンクリック
 
 [JS]POST (http://example.com/Api/?[フォームデータ])
 フォームデータをPOST

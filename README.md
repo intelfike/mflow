@@ -11,7 +11,7 @@ mflow test.mfw > test.html
 test.mfw
 
 ```
-ブラウザ | 表示・入力 | JS | 通信 | PHP
+[ブラウザ] 表示・入力 [JS] 通信 [PHP]
 
 [ブラウザ]
 ページ訪問
