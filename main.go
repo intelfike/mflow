@@ -14,6 +14,7 @@ type Column struct {
 	ID       int
 	cellType string // work OR arrow
 	title    string
+	cell     []*Cell
 }
 
 func parseColumns(headers []string) map[string]*Column {
@@ -32,11 +33,43 @@ func parseColumns(headers []string) map[string]*Column {
 }
 
 type Cell struct {
-	ID       int
-	Type     string
-	ColumnID int
-	text     string
-	origin   string
+	ID             int
+	Type           string
+	destTag        string
+	prefix, suffix string
+	text, origin   string
+	detail         string
+	bgcolor        string
+}
+
+var detailReg = regexp.MustCompile("\\([^()]+\\)\\s*$")
+
+func parseCell(text string) *Cell {
+	cell := new(Cell)
+	cell.origin = text
+	destTag, text, err := splitTag(text)
+	if err != nil {
+		cell.Type = "work"
+	} else {
+		cell.destTag = destTag
+		cell.Type = "arrow"
+	}
+
+	detail := detailReg.FindString(text)
+	if detail != "" {
+		text = strings.TrimSuffix(text, detail)
+		cell.detail = strings.Trim(detail, " 　\t()")
+	}
+
+	if strings.HasPrefix(text, "#") {
+		text = strings.TrimPrefix(text, "#")
+		cell.bgcolor = "yellow"
+	}
+
+	text = strings.Trim(text, " 　\t")
+
+	cell.text = text
+	return cell
 }
 
 func main() {
@@ -58,7 +91,7 @@ func main() {
 		return
 	}
 	cols := parseColumns(headers)
-	data := make([][]string, 0)
+	data := make([][]*Cell, 0)
 	wid := 0
 	row := 0
 	curTag := headers[0]
@@ -75,56 +108,58 @@ func main() {
 		}
 		curID := cols[curTag].ID
 		// タグを切り分ける
-		destTag, text, err := splitTag(line)
-		if err != nil { // ワークなら
+		cell := parseCell(line)
+		if cell.Type == "work" { // ワークなら
 			if !changed {
 				// もし前と同じカラムなら次の行を追加
-				data = append(data, make([]string, len(headers)))
+				data = append(data, make([]*Cell, len(headers)))
 				row++
 			}
 			wid++
 			// 書き込み
-			data[row-1][curID] = strconv.Itoa(wid) + ", " + line
+			cell.ID = wid
+			cell.prefix = strconv.Itoa(wid) + ", "
+			data[row-1][curID] = cell
 			changed = false
 			continue
 		}
 		// アローなら
-		_, ok := cols[destTag]
+		_, ok := cols[cell.destTag]
 		if !ok {
-			fmt.Println("Error:", n+1, "行目、", line, "\nカラムが見つかりませんでした:", destTag)
+			fmt.Println("Error:", n+1, "行目、", line, "\nカラムが見つかりませんでした:", cell.destTag)
 			os.Exit(1)
 		}
-		destID := cols[destTag].ID
-		arrow := "=>"
+		destID := cols[cell.destTag].ID
+		cell.prefix = "==["
+		cell.suffix = "]=>"
 		if curID > destID {
-			arrow = "<="
+			cell.prefix = "<=["
+			cell.suffix = "]=="
 		}
 		arrowID := (curID + destID) >> 1
 
-		if len(data) == 0 || data[row-1][arrowID] != "" {
+		if len(data) == 0 || data[row-1][arrowID] != nil {
 			// アロー書き込み先に文字があれば行を新しく作る
-			data = append(data, make([]string, len(headers)))
+			data = append(data, make([]*Cell, len(headers)))
 			row++
 		}
-		if len(data) > 1 && data[row-2][arrowID] != "" {
+		if len(data) > 1 && data[row-2][arrowID] != nil {
 			// 直上の要素が空じゃなければ一個隙間を開ける
-			data = append(data, make([]string, len(headers)))
+			data = append(data, make([]*Cell, len(headers)))
 			row++
 		}
 		// 値を登録
-		if text != "" {
-			detail := detailReg.FindString(text)
-			text = strings.TrimSuffix(text, detail)
-			data[row-1][arrowID] = arrow + "[" + text + "]" + arrow + detail
-		} else {
-			data[row-1][arrowID] = arrow
-		}
+		data[row-1][arrowID] = cell
 
 		// 後置処理
-		curTag = destTag
+		curTag = cell.destTag
 		changed = true
 	}
-	ht := createTable(headers, data)
+	hc := make([]*Cell, len(headers))
+	for n, _ := range hc {
+		hc[n] = parseCell(headers[n])
+	}
+	ht := createTable(hc, data)
 	fmt.Println(`<!DOCTYPE html>
 <title>` + os.Args[1] + `</title>
 <mate charset="utf-8">
@@ -177,15 +212,13 @@ func splitTag(text string) (string, string, error) {
 	return col, text, nil
 }
 
-var detailReg = regexp.MustCompile("\\([^()]+\\)\\s*$")
-
 // HTMLを作成する
-func createTable(headers []string, data [][]string) string {
+func createTable(headers []*Cell, data [][]*Cell) string {
 	ht := "<table>\n"
 	ht += "<tr>\n"
 	for n, v := range headers {
 		ht += `	<th class="col-` + strconv.Itoa(n) + `">`
-		ht += v
+		ht += v.text
 		ht += "</th>\n"
 	}
 	ht += "</tr>\n"
@@ -196,14 +229,17 @@ func createTable(headers []string, data [][]string) string {
 		swid := strconv.Itoa(wid)
 		ht += "<tr>\n"
 		for n2, v2 := range v {
-			ht += `	<td id="wflow-` + swid + `" class="col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `">`
-			detail := detailReg.FindString(v2)
-			if detail != "" {
-				ht += `<a href="#" onclick="alert('` + strings.Trim(detail, " 　\t()") + `')">`
-				ht += strings.TrimSuffix(v2, detail)
-				ht += `</a>`
+			if v2 != nil {
+				ht += `	<td id="wflow-` + swid + `" class="col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `" style="background-color:` + v2.bgcolor + `;">`
+				if v2.detail != "" {
+					ht += `<a href="#" onclick="alert('` + v2.detail + `')">`
+					ht += v2.prefix + v2.text + v2.suffix
+					ht += `</a>`
+				} else {
+					ht += v2.prefix + v2.text + v2.suffix
+				}
 			} else {
-				ht += v2
+				ht += `	<td id="wflow-` + swid + `" class="col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `">`
 			}
 			ht += "</td>\n"
 		}
@@ -215,9 +251,9 @@ func createTable(headers []string, data [][]string) string {
 
 func fetchHeader(lines []string) ([]string, error) {
 	head := lines[0]
-	headers := strings.Split(head, "|")
+	headers := regexp.MustCompile("\\[[^\\]]+\\]|[^\\[]+").FindAllString(head, -1)
 	for n, v := range headers {
-		headers[n] = strings.Trim(v, " 　\t")
+		headers[n] = strings.Trim(v, " 　\t[]")
 	}
 	return headers, nil
 }
@@ -229,7 +265,7 @@ mflow [filename]
 
 #### mflowファイルの書き方:
 ## 一行目 カラムの定義
-カラム1 | (中継1) | カラム2
+[カラム1] (中継1) [カラム2]
 
 ## 二行目以降 セルの定義
 # 行ごとにセル(ワーク・アロー)を定義します。
