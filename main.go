@@ -97,11 +97,59 @@ func main() {
 	os.Args[1] = strings.TrimSuffix(os.Args[1], ".mfw")
 	lines := strings.Split(string(b), "\n")
 
+	colArray, data, nextLine := createCells(lines)
+	ht := createTable(colArray, data)
+	result := `<!DOCTYPE html>
+<title>` + os.Args[1] + `</title>
+<mate charset="utf-8">
+<style>
+body {
+	background-color: #EEEEEE;
+	font-size: 18px;
+}
+table {
+	border-spacing: 0;
+	margin: 16px;
+	border-collapse: collapse;
+}
+th{
+	background-color: white !important;
+	padding: 8px;
+	border: 1px solid black;
+}
+th, td{
+	margin: 0;
+	vertical-align: top;
+}
+.work{
+	border-right: 1px solid black;
+	border-left: 1px solid black;
+	background-color: white;
+}
+.arrow{
+	background-color: rgba(0,0,0,0);
+	text-align: center;
+	font-size: 80%;
+}
+
+</style>
+<h1>` + os.Args[1] + `</h1>`
+	result += ht
+	for n, line := range lines[nextLine:] {
+		if line == "---" {
+			result += strings.Join(lines[nextLine+n+1:], "\n")
+			break
+		}
+	}
+	ioutil.WriteFile(os.Args[1]+".html", []byte(result), 0777)
+}
+
+func createCells(lines []string) ([]*Column, [][]*Cell, int) {
 	// ヘッダの作成
 	headers, err := fetchHeader(lines)
 	if err != nil {
 		fmt.Println(err)
-		return
+		os.Exit(1)
 	}
 	colArray, cols := parseColumns(headers)
 	data := make([][]*Cell, 0)
@@ -109,11 +157,11 @@ func main() {
 	row := 0
 	curTag := strings.Trim(headers[0], " 　\t[]")
 	changed := true
+	nextLine := 0
 
-	var description string
 	for n, line := range lines[1:] {
+		nextLine = n
 		if line == "---" {
-			description = strings.Join(lines[n+2:], "\n")
 			break
 		}
 		if line == "" {
@@ -185,45 +233,7 @@ func main() {
 		curTag = cell.destTag
 		changed = true
 	}
-	ht := createTable(colArray, data)
-	result := `<!DOCTYPE html>
-<title>` + os.Args[1] + `</title>
-<mate charset="utf-8">
-<style>
-body {
-	background-color: #EEEEEE;
-	font-size: 18px;
-}
-table {
-	border-spacing: 0;
-	margin: 16px;
-	border-top: 1px solid black;
-	border-left: 1px solid black;
-}
-th{
-	background-color: white !important;
-	padding: 8px;
-	border-bottom: 1px solid black;
-}
-th, td{
-	margin: 0;
-	vertical-align: top;
-}
-.work{
-	border-right: 1px solid black;
-	border-left: 1px solid black;
-	background-color: white;
-}
-.arrow{
-	background-color: rgba(0,0,0,0);
-	text-align: center;
-	font-size: 80%;
-}
-
-</style>`
-	result += ht
-	result += description
-	ioutil.WriteFile(os.Args[1]+".html", []byte(result), 0777)
+	return colArray, data, nextLine
 }
 
 var tagReg = regexp.MustCompile("^\\[[^\\]]+\\]")
