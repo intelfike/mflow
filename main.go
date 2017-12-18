@@ -151,6 +151,7 @@ func main() {
 		if len(data) > 1 && data[row-2][arrowID] != nil {
 			// 直上の要素が空じゃなければ一個隙間を開ける
 			data = append(data, make([]*Cell, len(headers)))
+			data[row-1][0] = &Cell{text: "-", Type: "work"}
 			row++
 		}
 		// 値を登録
