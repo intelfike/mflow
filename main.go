@@ -169,7 +169,7 @@ func main() {
 		if len(data) > 1 && data[row-2][arrowID] != nil {
 			// 直上の要素が空じゃなければ一個隙間を開ける
 			data = append(data, make([]*Cell, len(headers)))
-			data[row][curID] = &Cell{text: "-", Type: "dummy_work"}
+			data[row-1][0] = &Cell{text: "-", Type: "dummy_work"}
 			row++
 		}
 		if leftID == rightID {
