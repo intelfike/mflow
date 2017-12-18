@@ -77,11 +77,16 @@ func main() {
 		printUsage()
 		return
 	}
+	if !strings.HasSuffix(os.Args[1], ".mfw") {
+		fmt.Println("読み込むファイルの拡張子は.mfwで統一してください")
+		return
+	}
 	b, err := ioutil.ReadFile(os.Args[1])
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	os.Args[1] = strings.TrimSuffix(os.Args[1], ".mfw")
 	lines := strings.Split(string(b), "\n")
 
 	// ヘッダの作成
@@ -160,7 +165,7 @@ func main() {
 		hc[n] = parseCell(headers[n])
 	}
 	ht := createTable(hc, data)
-	fmt.Println(`<!DOCTYPE html>
+	result := `<!DOCTYPE html>
 <title>` + os.Args[1] + `</title>
 <mate charset="utf-8">
 <style>
@@ -193,9 +198,10 @@ th, td{
 	font-size: 80%;
 }
 
-</style>`)
-	fmt.Println(ht)
-	fmt.Println(description)
+</style>`
+	result += ht
+	result += description
+	ioutil.WriteFile(os.Args[1]+".html", []byte(result), 0777)
 }
 
 var tagReg = regexp.MustCompile("^\\[[^\\]]+\\]")
