@@ -131,6 +131,12 @@ th, td{
 	text-align: center;
 	font-size: 80%;
 }
+.left.work{
+	background-color: #CCC;
+}
+.left.arrow{
+	background-color: #AAA;
+}
 
 </style>
 <h1>` + os.Args[1] + `</h1>`
@@ -269,8 +275,10 @@ func createTable(headers []*Column, data [][]*Cell) string {
 		wid++
 		swid := strconv.Itoa(wid)
 		ht += "<tr>\n"
+		leftFlag := true
 		for n2, v2 := range v {
 			if v2 != nil {
+				leftFlag = false
 				switch v2.Type {
 				case "work", "dummy_work":
 					ht += `	<td id="wflow-` + swid + `" class="work col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `" style="background-color:` + v2.bgcolor + `;">`
@@ -293,11 +301,14 @@ func createTable(headers []*Column, data [][]*Cell) string {
 			} else {
 				class := ""
 				if n2%2 == 0 {
-					class = "work"
+					class = "work "
 				} else {
-					class = "arrow"
+					class = "arrow "
 				}
-				ht += `	<td id="wflow-` + swid + `" class="empty ` + class + ` col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `">`
+				if leftFlag {
+					class += "left "
+				}
+				ht += `	<td id="wflow-` + swid + `" class="empty ` + class + `col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `">`
 			}
 			ht += "</td>\n"
 		}
