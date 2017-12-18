@@ -14,22 +14,30 @@ type Column struct {
 	ID       int
 	cellType string // work OR arrow
 	title    string
-	cell     []*Cell
+	cells    []*Cell
 }
 
-func parseColumns(headers []string) map[string]*Column {
-	columns := map[string]*Column{}
+func parseColumns(headers []string) ([]*Column, map[string]*Column) {
+	colMap := map[string]*Column{}
+	colArray := make([]*Column, len(headers))
 	for n, v := range headers {
 		col := new(Column)
 		col.ID = n
-		col.title = v
-		col.cellType = "work"
-		if strings.HasPrefix(v, "(") && strings.HasSuffix(v, ")") {
-			col.cellType = "arrow"
+		col.cellType = "arrow"
+		if strings.HasPrefix(v, "[") && strings.HasSuffix(v, "]") {
+			col.cellType = "work"
 		}
-		columns[v] = col
+		v = strings.Trim(v, " 　\t[]")
+		col.title = v
+		colMap[v] = col
+		colArray[n] = col
 	}
-	return columns
+	return colArray, colMap
+}
+func fetchHeader(lines []string) ([]string, error) {
+	head := lines[0]
+	headers := regexp.MustCompile("\\[[^\\]]+\\]|[^\\[]*").FindAllString(head, -1)
+	return headers, nil
 }
 
 type Cell struct {
@@ -95,12 +103,12 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	cols := parseColumns(headers)
+	colArray, cols := parseColumns(headers)
 	data := make([][]*Cell, 0)
 	wid := 0
 	row := 0
-	curTag := headers[0]
-	changed := false
+	curTag := strings.Trim(headers[0], " 　\t[]")
+	changed := true
 
 	var description string
 	for n, line := range lines[1:] {
@@ -137,12 +145,22 @@ func main() {
 		destID := cols[cell.destTag].ID
 		cell.prefix = "==["
 		cell.suffix = "]=>"
+		dummyArrow := "==>"
+		leftID := curID
+		rightID := destID
 		if curID > destID {
 			cell.prefix = "<=["
 			cell.suffix = "]=="
+			dummyArrow = "<=="
+			leftID, rightID = rightID, leftID
 		}
-		arrowID := (curID + destID) >> 1
+		if cell.text == "" {
+			cell.prefix = ""
+			cell.suffix = ""
+			cell.text = dummyArrow
+		}
 
+		arrowID := (leftID + rightID) >> 1
 		if len(data) == 0 || data[row-1][arrowID] != nil {
 			// アロー書き込み先に文字があれば行を新しく作る
 			data = append(data, make([]*Cell, len(headers)))
@@ -151,21 +169,23 @@ func main() {
 		if len(data) > 1 && data[row-2][arrowID] != nil {
 			// 直上の要素が空じゃなければ一個隙間を開ける
 			data = append(data, make([]*Cell, len(headers)))
-			data[row-1][0] = &Cell{text: "-", Type: "work"}
+			data[row][curID] = &Cell{text: "-", Type: "dummy_work"}
 			row++
 		}
+		if leftID == rightID {
+			continue
+		}
 		// 値を登録
+		for n := leftID + 1; n < rightID; n++ {
+			data[row-1][n] = &Cell{text: dummyArrow, Type: "dummy_arrow"}
+		}
 		data[row-1][arrowID] = cell
 
 		// 後置処理
 		curTag = cell.destTag
 		changed = true
 	}
-	hc := make([]*Cell, len(headers))
-	for n, _ := range hc {
-		hc[n] = parseCell(headers[n])
-	}
-	ht := createTable(hc, data)
+	ht := createTable(colArray, data)
 	result := `<!DOCTYPE html>
 <title>` + os.Args[1] + `</title>
 <mate charset="utf-8">
@@ -187,14 +207,15 @@ th{
 }
 th, td{
 	margin: 0;
-	border-right: 1px solid black;
 	vertical-align: top;
 }
-.col-0, .col-2, .col-4, .col-6, .col-8, .col-10{
+.work{
+	border-right: 1px solid black;
+	border-left: 1px solid black;
 	background-color: white;
 }
-.col-1, .col-3, .col-5, .col-7, .col-9, .col-11{
-	background-color: #EEEEEE;
+.arrow{
+	background-color: rgba(0,0,0,0);
 	text-align: center;
 	font-size: 80%;
 }
@@ -220,12 +241,12 @@ func splitTag(text string) (string, string, error) {
 }
 
 // HTMLを作成する
-func createTable(headers []*Cell, data [][]*Cell) string {
+func createTable(headers []*Column, data [][]*Cell) string {
 	ht := "<table>\n"
 	ht += "<tr>\n"
 	for n, v := range headers {
 		ht += `	<th class="col-` + strconv.Itoa(n) + `">`
-		ht += v.text
+		ht += v.title
 		ht += "</th>\n"
 	}
 	ht += "</tr>\n"
@@ -237,7 +258,18 @@ func createTable(headers []*Cell, data [][]*Cell) string {
 		ht += "<tr>\n"
 		for n2, v2 := range v {
 			if v2 != nil {
-				ht += `	<td id="wflow-` + swid + `" class="col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `" style="background-color:` + v2.bgcolor + `;">`
+				switch v2.Type {
+				case "work", "dummy_work":
+					ht += `	<td id="wflow-` + swid + `" class="work col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `" style="background-color:` + v2.bgcolor + `;">`
+				case "arrow", "dummy_arrow":
+					if n2%2 == 0 {
+						ht += `	<td id="wflow-` + swid + `" class="arrow col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `" style="border-top:1px solid black; border-bottom:1px solid black;">`
+					} else {
+						ht += `	<td id="wflow-` + swid + `" class="arrow col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `">`
+					}
+				default:
+					fmt.Println(v2.Type)
+				}
 				if v2.detail != "" {
 					ht += `<a href="#" onclick="alert('` + v2.detail + `')">`
 					ht += v2.prefix + v2.text + v2.suffix
@@ -246,7 +278,13 @@ func createTable(headers []*Cell, data [][]*Cell) string {
 					ht += v2.prefix + v2.text + v2.suffix
 				}
 			} else {
-				ht += `	<td id="wflow-` + swid + `" class="col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `">`
+				class := ""
+				if n2%2 == 0 {
+					class = "work"
+				} else {
+					class = "arrow"
+				}
+				ht += `	<td id="wflow-` + swid + `" class="empty ` + class + ` col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `">`
 			}
 			ht += "</td>\n"
 		}
@@ -255,16 +293,6 @@ func createTable(headers []*Cell, data [][]*Cell) string {
 	ht += "</table>\n"
 	return ht
 }
-
-func fetchHeader(lines []string) ([]string, error) {
-	head := lines[0]
-	headers := regexp.MustCompile("\\[[^\\]]+\\]|[^\\[]*").FindAllString(head, -1)
-	for n, v := range headers {
-		headers[n] = strings.Trim(v, " 　\t[]")
-	}
-	return headers, nil
-}
-
 func printUsage() {
 	fmt.Println(`#### 使い方:
 mflow [filename]
