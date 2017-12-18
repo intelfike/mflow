@@ -137,8 +137,31 @@ th, td{
 .left.arrow{
 	background-color: #AAA;
 }
+#tip{
+	display: none;
+	position: absolute;
+	background-color: #DEF;
+	border: 1px solid black;
+	padding: 8px;
+	pointer-events: none;
+}
 
 </style>
+
+<script>
+function showTip(e, text){
+	tip.innerHTML = text
+	tip.style.left = (e.clientX+1) + 'px'
+	tip.style.top = (e.clientY+1) + 'px'
+	tip.style.display = 'block'
+}
+function hideTip(){
+	tip.style.display = 'none'
+}
+</script>
+
+<div id="tip"></div>
+
 <h1>` + os.Args[1] + `</h1>`
 	result += ht
 	for n, line := range lines[nextLine:] {
@@ -279,20 +302,28 @@ func createTable(headers []*Column, data [][]*Cell) string {
 		for n2, v2 := range v {
 			if v2 != nil {
 				leftFlag = false
+				events := ""
+				class := ""
+				style := ""
+				if v2.detail != "" {
+					events = ` onmouseover="showTip(event, '` + v2.detail + `')" onmouseout="hideTip()"`
+				}
 				switch v2.Type {
 				case "work", "dummy_work":
-					ht += `	<td id="wflow-` + swid + `" class="work col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `" style="background-color:` + v2.bgcolor + `;">`
+					class = "work"
+					style = `background-color:` + v2.bgcolor + `;`
 				case "arrow", "dummy_arrow":
+					class = "arrow"
 					if n2%2 == 0 {
-						ht += `	<td id="wflow-` + swid + `" class="arrow col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `" style="border-top:1px solid black; border-bottom:1px solid black;">`
-					} else {
-						ht += `	<td id="wflow-` + swid + `" class="arrow col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `">`
+						style = `border-top:1px solid black; border-bottom:1px solid black;`
 					}
 				default:
 					fmt.Println(v2.Type)
 				}
+				ht += `	<td class="` + class + ` col-` + strconv.Itoa(n2) + " row-" + strconv.Itoa(n) + `" style="` + style + `"` + events + `>`
+
 				if v2.detail != "" {
-					ht += `<a href="#" onclick="alert('` + v2.detail + `')">`
+					ht += `<a href="#" ` + events + `>`
 					ht += v2.prefix + v2.text + v2.suffix
 					ht += `</a>`
 				} else {
