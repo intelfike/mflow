@@ -241,15 +241,21 @@ func createCells(lines []string) ([]*Column, [][]*Cell, int) {
 		if len(data) == 0 || data[row-1][arrowID] != nil {
 			// アロー書き込み先に文字があれば行を新しく作る
 			newRow := make([]*Cell, len(headers))
-			newRow[curID] = &Cell{text: "-", Type: "dummy_work"}
+			newRow[curID] = &Cell{text: "↓", Type: "dummy_work"}
 			data = append(data, newRow)
+			if row >= 1 {
+				data[row][curID], data[row-1][curID] = data[row-1][curID], data[row][curID]
+			}
 			row++
 		}
 		if len(data) > 1 && data[row-2][arrowID] != nil {
 			// 直上の要素が空じゃなければ一個隙間を開ける
 			newRow := make([]*Cell, len(headers))
-			newRow[curID] = &Cell{text: "-", Type: "dummy_work"}
+			newRow[curID] = &Cell{text: "↓", Type: "dummy_work"}
 			data = append(data, newRow)
+			if row >= 1 {
+				data[row][curID], data[row-1][curID] = data[row-1][curID], data[row][curID]
+			}
 			row++
 		}
 		if leftID == rightID {
