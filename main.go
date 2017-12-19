@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -99,8 +100,9 @@ func main() {
 
 	colArray, data, nextLine := createCells(lines)
 	ht := createTable(colArray, data)
+	_, file := filepath.Split(os.Args[1])
 	result := `<!DOCTYPE html>
-<title>` + os.Args[1] + `</title>
+<title>` + file + `</title>
 <mate charset="utf-8">
 <style>
 body {
@@ -162,7 +164,7 @@ function hideTip(){
 
 <div id="tip"></div>
 
-<h1>` + os.Args[1] + `</h1>`
+<h1>` + file + `</h1>`
 	result += ht
 	for n, line := range lines[nextLine:] {
 		if line == "---" {
