@@ -11,6 +11,14 @@ import (
 	"strings"
 )
 
+type Flow struct {
+	Caption     string
+	Description string
+	Lines       []string
+	Columns     []*Column
+	ColMap      map[string]*Column
+}
+
 type Column struct {
 	ID       int
 	cellType string // work OR arrow
@@ -30,15 +38,25 @@ func parseColumns(headers []string) ([]*Column, map[string]*Column) {
 		}
 		v = strings.Trim(v, " 　\t[]")
 		col.title = v
-		colMap[v] = col
+		if col.cellType == "work" {
+			colMap[v] = col
+		}
 		colArray[n] = col
 	}
 	return colArray, colMap
 }
-func fetchHeader(lines []string) ([]string, error) {
-	head := lines[0]
-	headers := regexp.MustCompile("\\[[^\\]]+\\]|[^\\[]*").FindAllString(head, -1)
-	return headers, nil
+func fetchHeader(head string) (string, []string, error) {
+	caption := regexp.MustCompile("^===[^=]*===\\s*").FindString(head)
+	if caption == "" {
+		return "", nil, errors.New(head + ":サブタイトルが見つかりません")
+	}
+	head = strings.TrimPrefix(head, caption)
+	caption = strings.Trim(caption, "= ")
+	columns := regexp.MustCompile("\\[[^\\]]+\\]|[^\\[]*").FindAllString(head, -1)
+	if len(columns) == 0 {
+		return "", nil, errors.New(head + ":カラムが見つかりません")
+	}
+	return caption, columns, nil
 }
 
 type Cell struct {
@@ -98,8 +116,55 @@ func main() {
 	os.Args[1] = strings.TrimSuffix(os.Args[1], ".mfw")
 	lines := strings.Split(string(b), "\n")
 
-	colArray, data, nextLine := createCells(lines)
-	ht := createTable(colArray, data)
+	// 前置処理
+	flows := make([]*Flow, 0)
+	inDesc := false
+	isStart := true
+	StartMess := ""
+	for _, v := range lines {
+		if strings.HasPrefix(v, "===") {
+			caption, headers, err := fetchHeader(v)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			colArray, colMap := parseColumns(headers)
+			caption = strconv.Itoa(len(flows)+1) + ", " + caption
+			flows = append(flows, &Flow{
+				Caption: caption,
+				Columns: colArray,
+				ColMap:  colMap,
+			})
+			inDesc = true
+			isStart = false
+			continue
+		}
+		if isStart {
+			StartMess += v + "\n"
+			continue
+		}
+		if strings.HasPrefix(v, "---") {
+			inDesc = false
+			continue
+		}
+		if inDesc {
+			flows[len(flows)-1].Description += v + "\n"
+			continue
+		} else {
+			flows[len(flows)-1].Lines = append(flows[len(flows)-1].Lines, v)
+			continue
+		}
+	}
+
+	// HTMLを生成する
+	ht := ""
+	for _, v := range flows {
+		data := createCells(v.Lines, v.ColMap)
+		ht += createTable(v, data)
+	}
+
+	// caption, colArray, data, nextLine := createCells(lines)
+	// ht := createTable(caption, colArray, data)
 	_, file := filepath.Split(os.Args[1])
 	result := `<!DOCTYPE html>
 <title>` + file + `</title>
@@ -151,10 +216,14 @@ th, td{
 </style>
 
 <script>
+window.onload = function(){
+	document.body.style.marginBottom = window.innerHeight + 'px'
+}
+
 function showTip(e, text){
 	tip.innerHTML = text
-	tip.style.left = (e.clientX+1) + 'px'
-	tip.style.top = (e.clientY+1) + 'px'
+	tip.style.left = (window.scrollX + e.clientX+1) + 'px'
+	tip.style.top = (window.scrollY + e.clientY+1) + 'px'
 	tip.style.display = 'block'
 }
 function hideTip(){
@@ -164,64 +233,64 @@ function hideTip(){
 
 <div id="tip"></div>
 
-<h1>` + file + `</h1>`
+<h1>` + file + `</h1>
+` + StartMess
 	result += ht
-	for n, line := range lines[nextLine:] {
-		if line == "---" {
-			result += strings.Join(lines[nextLine+n+1:], "\n")
-			break
-		}
-	}
 	ioutil.WriteFile(os.Args[1]+".html", []byte(result), 0777)
 }
 
-func createCells(lines []string) ([]*Column, [][]*Cell, int) {
-	// ヘッダの作成
-	headers, err := fetchHeader(lines)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	colArray, cols := parseColumns(headers)
+func createCells(lines []string, cols map[string]*Column) [][]*Cell {
 	data := make([][]*Cell, 0)
 	wid := 0
 	row := 0
-	curTag := strings.Trim(headers[0], " 　\t[]")
-	changed := true
-	nextLine := 0
-
-	for n, line := range lines[1:] {
-		nextLine = n
-		if line == "---" {
-			break
+	curTag := ""
+	curID := 0
+	changed := false
+	firstTag := true
+	colLen := 0
+	for _, v := range cols {
+		if colLen < v.ID {
+			colLen = v.ID
 		}
+	}
+	colLen++
+	for n, line := range lines {
 		if line == "" {
 			continue
 		}
-		curID := cols[curTag].ID
+		cur, ok := cols[curTag]
+		if ok {
+			curID = cur.ID
+		}
 		// タグを切り分ける
 		cell := parseCell(line)
-		if cell.Type == "work" { // ワークなら
+		if cell.Type == "work" {
+			// ワークなら
 			if !changed {
 				// もし前と同じカラムなら次の行を追加
-				data = append(data, make([]*Cell, len(headers)))
+				data = append(data, make([]*Cell, colLen))
 				row++
 			}
 			wid++
 			// 書き込み
 			cell.ID = wid
 			cell.prefix = strconv.Itoa(wid) + ", "
-			data[row-1][curID] = cell
+			data[len(data)-1][curID] = cell
 			changed = false
 			continue
 		}
 		// アローなら
-		_, ok := cols[cell.destTag]
+		_, ok = cols[cell.destTag]
 		if !ok {
 			fmt.Println("Error:", n+1, "行目、", line, "\nカラムが見つかりませんでした:", cell.destTag)
 			os.Exit(1)
 		}
 		destID := cols[cell.destTag].ID
+		if firstTag {
+			curTag = cell.destTag
+			firstTag = false
+			continue
+		}
 		cell.prefix = "==["
 		cell.suffix = "]=>"
 		dummyArrow := "==>"
@@ -242,7 +311,7 @@ func createCells(lines []string) ([]*Column, [][]*Cell, int) {
 		arrowID := (leftID + rightID) >> 1
 		if len(data) == 0 || data[row-1][arrowID] != nil {
 			// アロー書き込み先に文字があれば行を新しく作る
-			newRow := make([]*Cell, len(headers))
+			newRow := make([]*Cell, colLen)
 			newRow[curID] = &Cell{text: "↓", Type: "dummy_work"}
 			data = append(data, newRow)
 			if row >= 1 {
@@ -252,7 +321,7 @@ func createCells(lines []string) ([]*Column, [][]*Cell, int) {
 		}
 		if len(data) > 1 && data[row-2][arrowID] != nil {
 			// 直上の要素が空じゃなければ一個隙間を開ける
-			newRow := make([]*Cell, len(headers))
+			newRow := make([]*Cell, colLen)
 			newRow[curID] = &Cell{text: "↓", Type: "dummy_work"}
 			data = append(data, newRow)
 			if row >= 1 {
@@ -273,7 +342,7 @@ func createCells(lines []string) ([]*Column, [][]*Cell, int) {
 		curTag = cell.destTag
 		changed = true
 	}
-	return colArray, data, nextLine
+	return data
 }
 
 var tagReg = regexp.MustCompile("^\\[[^\\]]+\\]")
@@ -291,10 +360,13 @@ func splitTag(text string) (string, string, error) {
 }
 
 // HTMLを作成する
-func createTable(headers []*Column, data [][]*Cell) string {
-	ht := "<table>\n"
+func createTable(flow *Flow, data [][]*Cell) string {
+	ht := ""
+	ht += "<h2>" + flow.Caption + "</h2>\n"
+	ht += "<p>" + flow.Description + "</p>"
+	ht += "<table>\n"
 	ht += "<tr>\n"
-	for n, v := range headers {
+	for n, v := range flow.Columns {
 		ht += `	<th class="col-` + strconv.Itoa(n) + `">`
 		ht += v.title
 		ht += "</th>\n"
@@ -360,12 +432,24 @@ func printUsage() {
 	fmt.Println(`#### 使い方:
 mflow [filename]
 
+#### 用語
+## ページ: 生成されるWebページのことです。複数のフローを内包できます
+## フロー: 表のことです。複数のワークとフローを内包できます
+## ワーク: 順次実行される仕事
+## アロー: 別のカラムに移動するときの動き(通信等)を表す
 
 #### mflowファイルの書き方:
-## 一行目 カラムの定義
-[カラム1] (中継1) [カラム2]
 
-## 二行目以降 セルの定義
+## 最初の===以前 ページの説明
+# 作成したページについて詳しい説明を書くことができます。
+
+## 最初の===以降 タイトルとカラムの定義
+=== タイトル === [カラム1] (中継1) [カラム2]
+
+## ---以前 フローの説明
+# フローについての詳しい説明を書くことができます。
+
+## ---以降 セルの定義
 # 行ごとにセル(ワーク・アロー)を定義します。
 
 ## ワーク
@@ -374,16 +458,24 @@ mflow [filename]
 内容(詳細)
 
 ## アロー
-# カラムを切り替えることができます。
+# ワークを書き込むカラムを切り替えることができます。
 # タグは、カラム名を入れてください。矢印の宛先のカラム名になります。
 [タグ]
 [タグ]説明
 [タグ]説明(詳細)
 
 #### 例:
-test.mfw
+ページタイトル.mfw
 ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-[ブラウザ] 表示・入力 [JS] 通信 [PHP]
+テスト用の表です
+ここにはページの詳細を書くことができます。
+
+=== フロー名 === [ブラウザ] 表示・入力 [JS] 通信 [PHP]
+
+ブラウザのテキストエリアのデータをPOSTするプログラムのフロー
+ここにはフローの詳細を書くことができます。
+
+---
 
 [ブラウザ]
 ページ訪問
@@ -405,9 +497,6 @@ HTMLで表示
 メッセージを閉じる
 終了
 
-
----
-テキストエリアのデータをPOSTするプログラムのフロー<br>
 ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 `)
 }
