@@ -44,4 +44,4 @@ HTMLで表示
 ```
 
 ## 変換後のページ
-<img src="https://github.com/intelfike/mflow/blob/master/sample_image/ss.png">
+<img src="https://github.com/intelfike/mflow/blob/master/sample_image/screen_shot.png">
