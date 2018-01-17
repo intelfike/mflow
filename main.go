@@ -171,7 +171,7 @@ func main() {
 <mate charset="utf-8">
 <style>
 body {
-	background-color: #EEEEEE;
+	background-color: #FFC;
 	font-size: 18px;
 }
 table {
