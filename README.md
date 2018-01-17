@@ -1,13 +1,13 @@
 # multiple flow
-順次処理、通信や入出力の流れを組み合わせて図に表すことができるツールです。
+並列処理、通信や入出力の流れを組み合わせて図に表すことができるツールです。
 
 ```
 # 独自形式ファイル → HTML
-mflow test.mfw > test.html
+mflow test.mfw
 ```
+test.htmlが出力されます。
 
-
-## 変換元ファイル
+# 使用例
 test.mfw
 
 ```
